@@ -1,0 +1,57 @@
+name: Manual Build App
+run-name: Build ${{ inputs.brand }}
+on:
+  workflow_dispatch:
+    inputs:
+      brand:
+        description: 'App brand for which container will be built'
+        type: choice
+        required: true
+        options:
+          - Setmore Beta
+          - Setmore Live
+          - AnswerConnect
+          - AnswerForce
+          - ServiceForge
+          - INCH
+      custom-build-number:
+        description: '[Optional] Custom build number'
+        type: number
+        required: false
+env:
+  BRAND: ${{ github.event.inputs.brand }}
+  XCODE_VERSION: 16.2
+  GH_ENVIRONMENT: |-
+    ${{ fromJson('{
+          "Setmore Beta": "Setmore",  
+          "Setmore Live": "Setmore"
+        }')[github.event.inputs.brand] || github.event.inputs.brand }}
+jobs:
+    build:
+        # Using large runner for fast build
+        runs-on: macos-15-xlarge
+        environment: |-
+          ${{ fromJson('{
+                "Setmore Beta": "Setmore",  
+                "Setmore Live": "Setmore"
+            }')[github.event.inputs.brand] || github.event.inputs.brand }}
+        steps:
+        - uses: actions/checkout@v3
+          with:
+            lfs: true
+        - name: Check environment
+          run: "echo 'Deployment environment: ${{ env.GH_ENVIRONMENT }}'"
+        - name: Configure git for SPM
+          uses: TLizer/git-auth@v1.1
+          with:
+            token: ${{ secrets.BI_VENDOR_PAT_IOS }}
+        - name: Xcode select
+          uses: maxim-lobanov/setup-xcode@v1
+          with:
+            xcode-version: ${{ env.XCODE_VERSION }}
+        - name: Build App
+          run: fastlane build appBrand:'${{ env.BRAND }}' customBuildNumber:${{ github.event.inputs.custom-build-number }}
+          env:
+            MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+            APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+            FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 120
